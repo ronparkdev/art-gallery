@@ -520,7 +520,7 @@ function onMouseUp(event) {
 function onMouseMove(event) {
   if (isFullscreen && isPointerLocked) {
     // 포인터가 락된 상태에서는 movementX/Y 사용
-    targetRotationY +=
+    targetRotationY -=
       (event.movementX || event.mozMovementX || event.webkitMovementX || 0) *
       0.002;
   } else if (isFullscreen) {
