@@ -23,6 +23,7 @@ const GRID_WIDTH = Math.ceil(30 / GRID_SIZE); // Total grid width
 const GRID_HEIGHT = Math.ceil(30 / GRID_SIZE); // Total grid height
 const DRAG_THRESHOLD = 5;
 const CLICK_TIMEOUT = 200; // milliseconds
+const WALL_MARGIN = 0.5; // 벽으로부터의 최소 거리
 let isPointerLocked = false;
 
 // Node class for A* pathfinding
@@ -65,19 +66,21 @@ function initGrid() {
   }
 }
 
+// isWalkable 함수 수정 - 벽 주변에 여유 공간 추가
 function isWalkable(x, z) {
   const playerRadius = 0.3;
+  const safetyMargin = WALL_MARGIN;
   const position = new THREE.Vector3(x, 1.7, z);
   const playerBox = new THREE.Box3();
   playerBox.min.set(
-    position.x - playerRadius,
+    position.x - (playerRadius + safetyMargin),
     position.y - 1,
-    position.z - playerRadius
+    position.z - (playerRadius + safetyMargin)
   );
   playerBox.max.set(
-    position.x + playerRadius,
+    position.x + (playerRadius + safetyMargin),
     position.y + 1,
-    position.z + playerRadius
+    position.z + (playerRadius + safetyMargin)
   );
 
   for (let wall of walls) {
@@ -87,6 +90,115 @@ function isWalkable(x, z) {
     }
   }
   return true;
+}
+
+// 경로 스무딩 함수 추가
+function smoothPath(path) {
+  if (!path || path.length <= 2) return path;
+
+  const smoothed = [path[0]];
+  let current = 0;
+
+  while (current < path.length) {
+    // 현재 위치에서 가능한 가장 먼 지점을 찾음
+    let farthest = current + 1;
+    for (let i = path.length - 1; i > current; i--) {
+      if (isDirectPathClear(path[current], path[i])) {
+        farthest = i;
+        break;
+      }
+    }
+
+    if (farthest === path.length - 1) {
+      smoothed.push(path[farthest]);
+      break;
+    }
+
+    current = farthest;
+    smoothed.push(path[current]);
+  }
+
+  return optimizeCorners(smoothed);
+}
+
+// 두 점 사이의 직선 경로가 유효한지 확인
+function isDirectPathClear(start, end) {
+  const STEPS = 10; // 체크할 중간 지점의 수
+  const direction = new THREE.Vector3().subVectors(end, start);
+  const stepSize = direction.length() / STEPS;
+  const stepDirection = direction.normalize();
+
+  for (let i = 1; i < STEPS; i++) {
+    const point = new THREE.Vector3()
+      .copy(start)
+      .add(stepDirection.multiplyScalar(stepSize * i));
+
+    if (!isWalkable(point.x, point.z)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// 코너 부분을 부드럽게 만드는 함수
+function optimizeCorners(path) {
+  if (path.length <= 2) return path;
+
+  const optimized = [];
+  const CORNER_RADIUS = 0.5;
+
+  for (let i = 0; i < path.length; i++) {
+    if (i === 0 || i === path.length - 1) {
+      optimized.push(path[i]);
+      continue;
+    }
+
+    const prev = path[i - 1];
+    const current = path[i];
+    const next = path[i + 1];
+
+    // 이전 점과 다음 점 사이의 각도 계산
+    const v1 = new THREE.Vector3().subVectors(current, prev);
+    const v2 = new THREE.Vector3().subVectors(next, current);
+    const angle = v1.angleTo(v2);
+
+    // 각도가 충분히 큰 경우에만 코너 최적화 적용
+    if (angle > Math.PI / 6) {
+      const cornerPoints = generateCornerPoints(
+        prev,
+        current,
+        next,
+        CORNER_RADIUS
+      );
+      optimized.push(...cornerPoints);
+    } else {
+      optimized.push(current);
+    }
+  }
+
+  return optimized;
+}
+
+// 코너 부분의 곡선 포인트 생성
+function generateCornerPoints(prev, current, next, radius) {
+  const v1 = new THREE.Vector3().subVectors(current, prev).normalize();
+  const v2 = new THREE.Vector3().subVectors(next, current).normalize();
+  const points = [];
+  const CURVE_SEGMENTS = 3;
+
+  for (let i = 0; i <= CURVE_SEGMENTS; i++) {
+    const t = i / CURVE_SEGMENTS;
+    const angle = Math.acos(v1.dot(v2)) * t;
+    const direction = new THREE.Vector3()
+      .copy(v1)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+      .multiplyScalar(radius);
+
+    points.push(new THREE.Vector3().copy(current).add(direction));
+  }
+
+  return points;
 }
 
 function getNeighbors(node) {
@@ -125,76 +237,81 @@ function getDistance(nodeA, nodeB) {
 }
 
 function findPath(startPos, targetPos) {
-  const startGrid = worldToGrid(startPos.x, startPos.z);
-  const targetGrid = worldToGrid(targetPos.x, targetPos.z);
+  const path = (() => {
+    const startGrid = worldToGrid(startPos.x, startPos.z);
+    const targetGrid = worldToGrid(targetPos.x, targetPos.z);
 
-  if (
-    !grid[startGrid.x] ||
-    !grid[startGrid.x][startGrid.z] ||
-    !grid[targetGrid.x] ||
-    !grid[targetGrid.x][targetGrid.z]
-  ) {
-    return null;
-  }
-
-  const startNode = grid[startGrid.x][startGrid.z];
-  const targetNode = grid[targetGrid.x][targetGrid.z];
-
-  if (!startNode.walkable || !targetNode.walkable) {
-    return null;
-  }
-
-  const openSet = [startNode];
-  const closedSet = new Set();
-
-  // Reset node values
-  for (let x = 0; x < GRID_WIDTH; x++) {
-    for (let z = 0; z < GRID_HEIGHT; z++) {
-      grid[x][z].gCost = 0;
-      grid[x][z].hCost = 0;
-      grid[x][z].parent = null;
+    if (
+      !grid[startGrid.x] ||
+      !grid[startGrid.x][startGrid.z] ||
+      !grid[targetGrid.x] ||
+      !grid[targetGrid.x][targetGrid.z]
+    ) {
+      return null;
     }
-  }
 
-  while (openSet.length > 0) {
-    let currentNode = openSet[0];
-    for (let i = 1; i < openSet.length; i++) {
-      if (
-        openSet[i].fCost < currentNode.fCost ||
-        (openSet[i].fCost === currentNode.fCost &&
-          openSet[i].hCost < currentNode.hCost)
-      ) {
-        currentNode = openSet[i];
+    const startNode = grid[startGrid.x][startGrid.z];
+    const targetNode = grid[targetGrid.x][targetGrid.z];
+
+    if (!startNode.walkable || !targetNode.walkable) {
+      return null;
+    }
+
+    const openSet = [startNode];
+    const closedSet = new Set();
+
+    // Reset node values
+    for (let x = 0; x < GRID_WIDTH; x++) {
+      for (let z = 0; z < GRID_HEIGHT; z++) {
+        grid[x][z].gCost = 0;
+        grid[x][z].hCost = 0;
+        grid[x][z].parent = null;
       }
     }
 
-    openSet.splice(openSet.indexOf(currentNode), 1);
-    closedSet.add(currentNode);
-
-    if (currentNode === targetNode) {
-      return retracePath(startNode, targetNode);
-    }
-
-    for (const neighbor of getNeighbors(currentNode)) {
-      if (!neighbor.walkable || closedSet.has(neighbor)) {
-        continue;
+    while (openSet.length > 0) {
+      let currentNode = openSet[0];
+      for (let i = 1; i < openSet.length; i++) {
+        if (
+          openSet[i].fCost < currentNode.fCost ||
+          (openSet[i].fCost === currentNode.fCost &&
+            openSet[i].hCost < currentNode.hCost)
+        ) {
+          currentNode = openSet[i];
+        }
       }
 
-      const newMovementCost =
-        currentNode.gCost + getDistance(currentNode, neighbor);
-      if (newMovementCost < neighbor.gCost || !openSet.includes(neighbor)) {
-        neighbor.gCost = newMovementCost;
-        neighbor.hCost = getDistance(neighbor, targetNode);
-        neighbor.parent = currentNode;
+      openSet.splice(openSet.indexOf(currentNode), 1);
+      closedSet.add(currentNode);
 
-        if (!openSet.includes(neighbor)) {
-          openSet.push(neighbor);
+      if (currentNode === targetNode) {
+        return retracePath(startNode, targetNode);
+      }
+
+      for (const neighbor of getNeighbors(currentNode)) {
+        if (!neighbor.walkable || closedSet.has(neighbor)) {
+          continue;
+        }
+
+        const newMovementCost =
+          currentNode.gCost + getDistance(currentNode, neighbor);
+        if (newMovementCost < neighbor.gCost || !openSet.includes(neighbor)) {
+          neighbor.gCost = newMovementCost;
+          neighbor.hCost = getDistance(neighbor, targetNode);
+          neighbor.parent = currentNode;
+
+          if (!openSet.includes(neighbor)) {
+            openSet.push(neighbor);
+          }
         }
       }
     }
-  }
 
-  return null;
+    return null;
+  })();
+  if (!path) return null;
+
+  return smoothPath(path);
 }
 
 function retracePath(startNode, endNode) {
