@@ -748,7 +748,7 @@ function animate() {
 
     if (distance > 0.1) {
       // 거리에 비례한 이동 속도 (더 멀수록 더 빠르게, 최대 속도 제한)
-      const speed = Math.min(distance * 0.1, 0.2);
+      const speed = 0.2;
       const direction = new THREE.Vector3()
         .subVectors(currentTarget, camera.position)
         .normalize();
