@@ -23,6 +23,7 @@ const GRID_WIDTH = Math.ceil(30 / GRID_SIZE); // Total grid width
 const GRID_HEIGHT = Math.ceil(30 / GRID_SIZE); // Total grid height
 const DRAG_THRESHOLD = 5;
 const CLICK_TIMEOUT = 200; // milliseconds
+let isPointerLocked = false;
 
 // Node class for A* pathfinding
 class Node {
@@ -348,11 +349,85 @@ function init() {
     document.getElementById("fullscreen-btn").textContent = isFullscreen
       ? "Exit Full View"
       : "Full View";
+    if (isFullscreen) {
+      // 풀스크린 요청
+      const element = document.documentElement;
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      }
+    } else {
+      // 풀스크린 해제
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+    }
+  });
+
+  // init 함수에 추가할 이벤트 리스너들
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+  document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+  document.addEventListener("msfullscreenchange", handleFullscreenChange);
+
+  // 풀스크린 변경 핸들러 함수
+  function handleFullscreenChange() {
+    isFullscreen =
+      document.fullscreenElement ||
+      document.mozFullScreenElement ||
+      document.webkitFullscreenElement ||
+      document.msFullscreenElement;
+
+    document.getElementById("fullscreen-btn").textContent = isFullscreen
+      ? "Exit Full View"
+      : "Full View";
+
+    if (isFullscreen && !isPointerLocked) {
+      // 풀스크린 시작시 포인터 락 요청
+      const element = document.documentElement;
+      element.requestPointerLock =
+        element.requestPointerLock ||
+        element.mozRequestPointerLock ||
+        element.webkitRequestPointerLock;
+      element.requestPointerLock();
+    } else if (!isFullscreen && isPointerLocked) {
+      // 풀스크린 종료시 포인터 락 해제
+      document.exitPointerLock =
+        document.exitPointerLock ||
+        document.mozExitPointerLock ||
+        document.webkitExitPointerLock;
+      document.exitPointerLock();
+    }
+
     if (!isFullscreen) {
       camera.rotation.y = 0;
       targetRotationY = 0;
     }
-  });
+  }
+
+  // init 함수에 추가할 포인터 락 이벤트 리스너
+  document.addEventListener("pointerlockchange", handlePointerLockChange);
+  document.addEventListener("mozpointerlockchange", handlePointerLockChange);
+  document.addEventListener("webkitpointerlockchange", handlePointerLockChange);
+
+  // 포인터 락 상태 변경 핸들러
+  function handlePointerLockChange() {
+    isPointerLocked =
+      document.pointerLockElement === document.documentElement ||
+      document.mozPointerLockElement === document.documentElement ||
+      document.webkitPointerLockElement === document.documentElement;
+  }
 }
 
 function onKeyDown(event) {
@@ -374,10 +449,17 @@ function onKeyDown(event) {
       moveRight = true;
       break;
     case "Escape":
-      isFullscreen = false;
-      document.getElementById("fullscreen-btn").textContent = "Full View";
-      camera.rotation.y = 0;
-      targetRotationY = 0;
+      if (isFullscreen) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+      }
       break;
   }
 }
@@ -436,7 +518,12 @@ function onMouseUp(event) {
 }
 
 function onMouseMove(event) {
-  if (isFullscreen) {
+  if (isFullscreen && isPointerLocked) {
+    // 포인터가 락된 상태에서는 movementX/Y 사용
+    targetRotationY +=
+      (event.movementX || event.mozMovementX || event.webkitMovementX || 0) *
+      0.002;
+  } else if (isFullscreen) {
     targetRotationY = (event.clientX / window.innerWidth - 0.5) * Math.PI * 2;
   } else if (isDragging) {
     const deltaMove = {
