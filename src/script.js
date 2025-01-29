@@ -56,13 +56,47 @@ function gridToWorld(gridX, gridZ) {
 }
 
 function initGrid() {
+  // 그리드 초기화시 캐릭터 크기를 고려한 여유 공간 체크
+  const SAFETY_BUFFER = 0.3; // 추가 여유 공간
+  const TOTAL_RADIUS = 0.3 + SAFETY_BUFFER; // 캐릭터 반지름 + 여유 공간
+
   for (let x = 0; x < GRID_WIDTH; x++) {
     grid[x] = [];
     for (let z = 0; z < GRID_HEIGHT; z++) {
       const worldPos = gridToWorld(x, z);
-      grid[x][z] = new Node(x, z, isWalkable(worldPos.x, worldPos.z));
+
+      // 해당 그리드 셀의 모서리들도 체크
+      const corners = [
+        { x: worldPos.x - GRID_SIZE / 2, z: worldPos.z - GRID_SIZE / 2 },
+        { x: worldPos.x - GRID_SIZE / 2, z: worldPos.z + GRID_SIZE / 2 },
+        { x: worldPos.x + GRID_SIZE / 2, z: worldPos.z - GRID_SIZE / 2 },
+        { x: worldPos.x + GRID_SIZE / 2, z: worldPos.z + GRID_SIZE / 2 },
+        { x: worldPos.x, z: worldPos.z }, // 중심점
+      ];
+
+      // 모든 체크포인트가 walkable해야 해당 그리드가 walkable
+      const walkable = corners.every((point) =>
+        isPositionWalkable(point.x, point.z, TOTAL_RADIUS)
+      );
+
+      grid[x][z] = new Node(x, z, walkable);
     }
   }
+}
+
+function isPositionWalkable(x, z, radius) {
+  const position = new THREE.Vector3(x, 1.7, z);
+  const playerBox = new THREE.Box3();
+  playerBox.min.set(position.x - radius, position.y - 1, position.z - radius);
+  playerBox.max.set(position.x + radius, position.y + 1, position.z + radius);
+
+  for (let wall of walls) {
+    const wallBox = new THREE.Box3().setFromObject(wall);
+    if (playerBox.intersectsBox(wallBox)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // A* 관련 코드 제거하고 새로운 경로 찾기 시스템 구현
@@ -103,114 +137,182 @@ function isPointBetween(point, start, end) {
   return Math.abs(d1 + d2 - d3) < EPSILON;
 }
 
-function findNearestCornerPoint(start, target) {
-  let bestCorner = null;
-  let bestDistance = Infinity;
-  const OFFSET_DISTANCE = 0.8; // 벽에서 더 멀리 떨어지도록
+function findPath(startPos, targetPos) {
+  // 1. 먼저 직선 경로 시도
+  if (isDirectPathClear(startPos, targetPos)) {
+    return [startPos, targetPos];
+  }
 
-  for (const wall of walls) {
-    const corners = getWallCorners(wall);
-    for (const corner of corners) {
-      const cornerWithOffset = calculateOffsetPoint(
-        corner,
-        wall,
-        OFFSET_DISTANCE
-      );
+  // 2. 직선 경로가 불가능한 경우 A* 경로 찾기
+  const aStarPath = findAStarPath(startPos, targetPos);
+  if (!aStarPath) return null;
 
-      // 시작점과 목표점에서 코너까지의 경로가 모두 유효한지 확인
+  // 3. 직선화 수행
+  return simplifyPath(aStarPath);
+}
+
+function getNeighbors(node) {
+  const neighbors = [];
+  // 8방향 이동 (상하좌우 + 대각선)
+  const directions = [
+    { x: 0, z: 1 }, // 상
+    { x: 1, z: 0 }, // 우
+    { x: 0, z: -1 }, // 하
+    { x: -1, z: 0 }, // 좌
+    { x: 1, z: 1 }, // 우상
+    { x: 1, z: -1 }, // 우하
+    { x: -1, z: -1 }, // 좌하
+    { x: -1, z: 1 }, // 좌상
+  ];
+
+  for (const dir of directions) {
+    const newX = node.x + dir.x;
+    const newZ = node.z + dir.z;
+
+    if (newX >= 0 && newX < GRID_WIDTH && newZ >= 0 && newZ < GRID_HEIGHT) {
+      // 대각선 이동시 양쪽 노드가 모두 walkable해야 함
+      if (Math.abs(dir.x) === 1 && Math.abs(dir.z) === 1) {
+        const horizontalNode = grid[newX][node.z];
+        const verticalNode = grid[node.x][newZ];
+
+        if (!horizontalNode.walkable || !verticalNode.walkable) {
+          continue;
+        }
+      }
+
+      const neighbor = grid[newX][newZ];
+      if (neighbor.walkable) {
+        neighbors.push(neighbor);
+      }
+    }
+  }
+
+  return neighbors;
+}
+
+function getDistance(nodeA, nodeB) {
+  const distX = Math.abs(nodeA.x - nodeB.x);
+  const distZ = Math.abs(nodeA.z - nodeB.z);
+
+  // 대각선 이동은 14 (√2 * 10), 직선 이동은 10
+  if (distX > distZ) {
+    return 14 * distZ + 10 * (distX - distZ);
+  }
+  return 14 * distX + 10 * (distZ - distX);
+}
+
+function findAStarPath(startPos, targetPos) {
+  const startGrid = worldToGrid(startPos.x, startPos.z);
+  const targetGrid = worldToGrid(targetPos.x, targetPos.z);
+
+  if (
+    !grid[startGrid.x] ||
+    !grid[startGrid.x][startGrid.z] ||
+    !grid[targetGrid.x] ||
+    !grid[targetGrid.x][targetGrid.z]
+  ) {
+    return null;
+  }
+
+  const startNode = grid[startGrid.x][startGrid.z];
+  const targetNode = grid[targetGrid.x][targetGrid.z];
+
+  if (!startNode.walkable || !targetNode.walkable) {
+    return null;
+  }
+
+  // A* 알고리즘으로 경로 찾기 (기존 코드)
+  const openSet = [startNode];
+  const closedSet = new Set();
+
+  // Reset node values
+  for (let x = 0; x < GRID_WIDTH; x++) {
+    for (let z = 0; z < GRID_HEIGHT; z++) {
+      grid[x][z].gCost = 0;
+      grid[x][z].hCost = 0;
+      grid[x][z].parent = null;
+    }
+  }
+
+  while (openSet.length > 0) {
+    let currentNode = openSet[0];
+    for (let i = 1; i < openSet.length; i++) {
       if (
-        isDirectPathClear(start, cornerWithOffset) &&
-        isDirectPathClear(cornerWithOffset, target)
+        openSet[i].fCost < currentNode.fCost ||
+        (openSet[i].fCost === currentNode.fCost &&
+          openSet[i].hCost < currentNode.hCost)
       ) {
-        // 전체 경로 길이 계산 (시작->코너->목표)
-        const totalDistance =
-          start.distanceTo(cornerWithOffset) +
-          cornerWithOffset.distanceTo(target);
+        currentNode = openSet[i];
+      }
+    }
 
-        // 더 짧은 경로 선택
-        if (totalDistance < bestDistance) {
-          bestDistance = totalDistance;
-          bestCorner = cornerWithOffset;
+    openSet.splice(openSet.indexOf(currentNode), 1);
+    closedSet.add(currentNode);
+
+    if (currentNode === targetNode) {
+      return retracePath(startNode, targetNode);
+    }
+
+    for (const neighbor of getNeighbors(currentNode)) {
+      if (!neighbor.walkable || closedSet.has(neighbor)) continue;
+
+      const newMovementCost =
+        currentNode.gCost + getDistance(currentNode, neighbor);
+      if (newMovementCost < neighbor.gCost || !openSet.includes(neighbor)) {
+        neighbor.gCost = newMovementCost;
+        neighbor.hCost = getDistance(neighbor, targetNode);
+        neighbor.parent = currentNode;
+
+        if (!openSet.includes(neighbor)) {
+          openSet.push(neighbor);
         }
       }
     }
   }
 
-  // 직선 거리의 1.5배보다 긴 우회로는 제외
-  const directDistance = start.distanceTo(target);
-  if (bestDistance > directDistance * 1.5) {
-    return null;
-  }
-
-  return bestCorner;
-}
-
-function calculateOffsetPoint(corner, wall, distance) {
-  const wallNormal = new THREE.Vector3();
-
-  // 벽의 방향에 따라 수직 방향 계산
-  if (Math.abs(wall.scale.x) > Math.abs(wall.scale.z)) {
-    // 수직 벽
-    wallNormal.set(0, 0, 1);
-  } else {
-    // 수평 벽
-    wallNormal.set(1, 0, 0);
-  }
-
-  // 코너에서 카메라를 향하는 방향 계산
-  const toCamera = new THREE.Vector3()
-    .subVectors(camera.position, corner)
-    .normalize();
-
-  // 카메라 방향과 같은 방향의 오프셋 선택
-  if (wallNormal.dot(toCamera) < 0) {
-    wallNormal.multiplyScalar(-1);
-  }
-
-  // 오프셋 적용
-  return corner.clone().add(wallNormal.multiplyScalar(distance));
-}
-
-function findPath(start, target) {
-  // 1. 직선 경로 가능한지 체크
-  if (isDirectPathClear(start, target)) {
-    return [target];
-  }
-
-  // 2. 코너 포인트를 찾아 경유
-  const cornerPoint = findNearestCornerPoint(start, target);
-  if (cornerPoint) {
-    // 코너를 찾았다면 코너를 경유
-    return [cornerPoint, target];
-  }
-
-  // 3. 경로를 찾지 못했다면 null 반환
   return null;
 }
 
-function isWalkable(x, z) {
-  const playerRadius = 0.3;
-  const safetyMargin = 0.3;
-  const position = new THREE.Vector3(x, 1.7, z);
-  const playerBox = new THREE.Box3();
-  playerBox.min.set(
-    position.x - (playerRadius + safetyMargin),
-    position.y - 1,
-    position.z - (playerRadius + safetyMargin)
-  );
-  playerBox.max.set(
-    position.x + (playerRadius + safetyMargin),
-    position.y + 1,
-    position.z + (playerRadius + safetyMargin)
-  );
+function simplifyPath(path) {
+  if (path.length <= 2) return path;
 
-  for (let wall of walls) {
-    const wallBox = new THREE.Box3().setFromObject(wall);
-    if (playerBox.intersectsBox(wallBox)) {
-      return false;
+  const result = [path[0]];
+  let currentPoint = path[0];
+
+  while (currentPoint !== path[path.length - 1]) {
+    let furthestReachable = null;
+    let maxDistance = 0;
+
+    // 현재 위치에서 도달 가능한 가장 먼 점 찾기
+    for (let i = path.length - 1; i > path.indexOf(currentPoint); i--) {
+      const target = path[i];
+      if (isDirectPathClear(currentPoint, target)) {
+        const distance = currentPoint.distanceTo(target);
+        if (distance > maxDistance) {
+          maxDistance = distance;
+          furthestReachable = target;
+        }
+      }
     }
+
+    if (!furthestReachable) {
+      // 다음 점으로 이동
+      const nextIndex = path.indexOf(currentPoint) + 1;
+      if (nextIndex >= path.length) break;
+      furthestReachable = path[nextIndex];
+    }
+
+    if (furthestReachable !== result[result.length - 1]) {
+      result.push(furthestReachable);
+    }
+    currentPoint = furthestReachable;
   }
-  return true;
+
+  return result;
+}
+
+function isWalkable(x, z) {
+  return isPositionWalkable(x, z, 0.3 + 0.3); // character radius + safety buffer
 }
 
 // 두 점 사이의 직선 경로가 유효한지 확인
