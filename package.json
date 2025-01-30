@@ -4,11 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "live-server ."
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "live-server": "^1.2.2"
-  }
+    "three": "^0.172.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "@types/three": "^0.172.0",
+    "live-server": "^1.2.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11"
+  },
+  "type": "module"
 }
