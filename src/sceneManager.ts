@@ -37,16 +37,19 @@ export class SceneManager {
   constructor() {
     // TextureLoader 인스턴스 생성 및 텍스처 로드
     const textureLoader = new THREE.TextureLoader();
-    this.wallTexture = textureLoader.load("/textures/wall.jpg", (texture) => {
-      // 텍스처 반복 설정
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(2, 2); // 텍스처 반복 횟수 조정
+    this.wallTexture = textureLoader.load(
+      `${import.meta.env.BASE_URL}textures/wall.jpg`,
+      (texture) => {
+        // 텍스처 반복 설정
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(2, 2); // 텍스처 반복 횟수 조정
 
-      // 텍스처 품질 설정
-      texture.magFilter = THREE.LinearFilter;
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-    });
+        // 텍스처 품질 설정
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+      }
+    );
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xf0f0f0);
