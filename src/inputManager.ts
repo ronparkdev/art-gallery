@@ -19,6 +19,12 @@ export class InputManager {
     dragDistance: 0,
   };
 
+  // 멀티터치 처리를 위한 상태
+  private touchState = {
+    initialDistance: 0,
+    lastTouchRotation: 0,
+  };
+
   constructor(
     private camera: THREE.Camera,
     private sceneManager: SceneManager,
@@ -30,11 +36,23 @@ export class InputManager {
   }
 
   private setupEventListeners(): void {
+    // 기존 마우스/키보드 이벤트
     document.addEventListener("keydown", this.handleKeyDown.bind(this));
     document.addEventListener("keyup", this.handleKeyUp.bind(this));
     document.addEventListener("mousedown", this.handleMouseDown.bind(this));
     document.addEventListener("mouseup", this.handleMouseUp.bind(this));
     document.addEventListener("mousemove", this.handleMouseMove.bind(this));
+
+    // 터치 이벤트 추가
+    document.addEventListener("touchstart", this.handleTouchStart.bind(this), {
+      passive: false,
+    });
+    document.addEventListener("touchend", this.handleTouchEnd.bind(this), {
+      passive: false,
+    });
+    document.addEventListener("touchmove", this.handleTouchMove.bind(this), {
+      passive: false,
+    });
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
@@ -107,7 +125,6 @@ export class InputManager {
 
   private handleMouseMove(event: MouseEvent): void {
     if (this.gameState.isFullscreen && this.gameState.isPointerLocked) {
-      // 포인터가 락된 상태에서는 movementX/Y 사용
       this.onRotate(
         (event.movementX ||
           (event as any).mozMovementX ||
@@ -136,32 +153,124 @@ export class InputManager {
       };
     }
 
-    // Show target indicator only when not in fullscreen and not dragging (or drag just started)
-    if (
-      !this.gameState.isFullscreen &&
-      (!this.dragState.isDragging ||
-        this.dragState.dragDistance < DRAG_THRESHOLD)
-    ) {
-      const raycaster = new THREE.Raycaster();
-      const mouse = new THREE.Vector2(
-        (event.clientX / window.innerWidth) * 2 - 1,
-        -(event.clientY / window.innerHeight) * 2 + 1
-      );
+    this.updateTargetIndicator(event.clientX, event.clientY);
+  }
 
-      raycaster.setFromCamera(mouse, this.camera);
-      const intersects = raycaster.intersectObject(
-        this.sceneManager.getFloor()
-      );
+  private handleTouchStart(event: TouchEvent): void {
+    event.preventDefault();
 
-      if (intersects.length > 0) {
-        const point = intersects[0].point;
-        this.sceneManager.updateTargetIndicator(point);
-      } else {
-        this.sceneManager.updateTargetIndicator(null);
+    if (!this.gameState.isFullscreen) {
+      const touch = event.touches[0];
+      this.dragState = {
+        isDragging: true,
+        dragDistance: 0,
+        dragStartTime: Date.now(),
+        dragStartPosition: { x: touch.clientX, y: touch.clientY },
+        previousMousePosition: { x: touch.clientX, y: touch.clientY },
+      };
+
+      // 멀티터치 상태 저장
+      if (event.touches.length === 2) {
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        this.touchState.initialDistance = Math.hypot(
+          touch2.clientX - touch1.clientX,
+          touch2.clientY - touch1.clientY
+        );
+        this.touchState.lastTouchRotation = Math.atan2(
+          touch2.clientY - touch1.clientY,
+          touch2.clientX - touch1.clientX
+        );
       }
-    } else {
-      // Hide indicator in fullscreen mode or while dragging
-      this.sceneManager.updateTargetIndicator(null);
+    }
+  }
+
+  private handleTouchEnd(event: TouchEvent): void {
+    event.preventDefault();
+
+    const dragDuration = Date.now() - this.dragState.dragStartTime;
+
+    if (
+      this.dragState.isDragging &&
+      this.dragState.dragDistance < DRAG_THRESHOLD &&
+      dragDuration < CLICK_TIMEOUT
+    ) {
+      // 터치 끝난 위치로 이동 처리
+      const touch = event.changedTouches[0];
+      this.handleTouchClick(touch);
+    }
+
+    this.dragState.isDragging = false;
+  }
+
+  private handleTouchMove(event: TouchEvent): void {
+    event.preventDefault();
+
+    if (event.touches.length === 1) {
+      // 싱글 터치: 드래그로 회전
+      const touch = event.touches[0];
+
+      if (this.gameState.isFullscreen) {
+        this.onRotate(-(touch.clientX / window.innerWidth - 0.5) * Math.PI * 2);
+      } else if (this.dragState.isDragging) {
+        const deltaMove = {
+          x: touch.clientX - this.dragState.previousMousePosition.x,
+          y: touch.clientY - this.dragState.previousMousePosition.y,
+        };
+
+        this.dragState.dragDistance += Math.sqrt(
+          deltaMove.x * deltaMove.x + deltaMove.y * deltaMove.y
+        );
+
+        if (this.dragState.dragDistance > DRAG_THRESHOLD) {
+          this.onRotate(deltaMove.x * -0.01);
+        }
+
+        this.dragState.previousMousePosition = {
+          x: touch.clientX,
+          y: touch.clientY,
+        };
+      }
+
+      this.updateTargetIndicator(touch.clientX, touch.clientY);
+    } else if (event.touches.length === 2) {
+      // 멀티터치: 핀치 줌과 회전 처리
+      const touch1 = event.touches[0];
+      const touch2 = event.touches[1];
+
+      // 핀치 줌 거리 계산
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+
+      // 회전 각도 계산
+      const currentRotation = Math.atan2(
+        touch2.clientY - touch1.clientY,
+        touch2.clientX - touch1.clientX
+      );
+
+      const rotationDelta = currentRotation - this.touchState.lastTouchRotation;
+      this.touchState.lastTouchRotation = currentRotation;
+
+      // 회전 적용
+      this.onRotate(rotationDelta);
+    }
+  }
+
+  private handleTouchClick(touch: Touch): void {
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(
+      (touch.clientX / window.innerWidth) * 2 - 1,
+      -(touch.clientY / window.innerHeight) * 2 + 1
+    );
+
+    raycaster.setFromCamera(mouse, this.camera);
+    const intersects = raycaster.intersectObject(this.sceneManager.getFloor());
+
+    if (intersects.length > 0) {
+      const targetPoint = intersects[0].point;
+      this.onMove(targetPoint);
     }
   }
 
@@ -178,6 +287,36 @@ export class InputManager {
     if (intersects.length > 0) {
       const targetPoint = intersects[0].point;
       this.onMove(targetPoint);
+    }
+  }
+
+  private updateTargetIndicator(clientX: number, clientY: number): void {
+    // Show target indicator only when not in fullscreen and not dragging (or drag just started)
+    if (
+      !this.gameState.isFullscreen &&
+      (!this.dragState.isDragging ||
+        this.dragState.dragDistance < DRAG_THRESHOLD)
+    ) {
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2(
+        (clientX / window.innerWidth) * 2 - 1,
+        -(clientY / window.innerHeight) * 2 + 1
+      );
+
+      raycaster.setFromCamera(mouse, this.camera);
+      const intersects = raycaster.intersectObject(
+        this.sceneManager.getFloor()
+      );
+
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        this.sceneManager.updateTargetIndicator(point);
+      } else {
+        this.sceneManager.updateTargetIndicator(null);
+      }
+    } else {
+      // Hide indicator in fullscreen mode or while dragging
+      this.sceneManager.updateTargetIndicator(null);
     }
   }
 
