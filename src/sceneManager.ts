@@ -380,7 +380,6 @@ export class SceneManager {
     const seatGeometry = new THREE.BoxGeometry(2, 0.1, 0.6);
     const seatMaterial = new THREE.MeshPhongMaterial({
       color: 0x4a4a4a,
-      roughness: 0.3,
     });
     const seat = new THREE.Mesh(seatGeometry, seatMaterial);
     seat.position.y = 0.15;
@@ -421,7 +420,6 @@ export class SceneManager {
     const poleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5);
     const poleMaterial = new THREE.MeshPhongMaterial({
       color: 0x4a4a4a,
-      metalness: 0.5,
     });
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
     pole.position.y = 0.75;
@@ -430,7 +428,6 @@ export class SceneManager {
     const signGeometry = new THREE.BoxGeometry(0.8, 0.6, 0.05);
     const signMaterial = new THREE.MeshPhongMaterial({
       color: 0x2c3e50,
-      metalness: 0.3,
     });
     const sign = new THREE.Mesh(signGeometry, signMaterial);
     sign.position.y = 1.3;

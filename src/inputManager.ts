@@ -238,12 +238,6 @@ export class InputManager {
       const touch1 = event.touches[0];
       const touch2 = event.touches[1];
 
-      // 핀치 줌 거리 계산
-      const currentDistance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-
       // 회전 각도 계산
       const currentRotation = Math.atan2(
         touch2.clientY - touch1.clientY,
