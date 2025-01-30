@@ -208,12 +208,26 @@ export class GameController {
       const currentTarget = this.gameState.currentPath[0];
       const distance = this.camera.position.distanceTo(currentTarget);
 
+      // Calculate desired rotation based on movement direction
+      const direction = new THREE.Vector3()
+        .subVectors(currentTarget, this.camera.position)
+        .normalize();
+
+      // Change the target angle calculation (add PI to reverse direction)
+      const targetAngle = Math.atan2(-direction.x, -direction.z);
+
+      // Smoothly rotate camera towards movement direction
+      const rotationDiff = targetAngle - this.camera.rotation.y;
+
+      // Normalize the rotation difference to [-PI, PI]
+      let normalizedDiff = rotationDiff;
+      while (normalizedDiff > Math.PI) normalizedDiff -= 2 * Math.PI;
+      while (normalizedDiff < -Math.PI) normalizedDiff += 2 * Math.PI;
+
+      this.gameState.targetRotationY = this.camera.rotation.y + normalizedDiff;
+
       if (distance > 0.1) {
         const speed = PLAYER_CONFIG.MOVEMENT_SPEED;
-        const direction = new THREE.Vector3()
-          .subVectors(currentTarget, this.camera.position)
-          .normalize();
-
         const movement = direction.multiplyScalar(speed);
         const newPosition = this.camera.position.clone().add(movement);
 
@@ -293,7 +307,8 @@ export class GameController {
   private updateRotation(): void {
     this.camera.rotation.y +=
       (this.gameState.targetRotationY - this.camera.rotation.y) *
-      PLAYER_CONFIG.ROTATION_SPEED;
+      PLAYER_CONFIG.ROTATION_SPEED *
+      (this.gameState.isMoving ? 0.3 : 1);
   }
 
   private animate = (): void => {
