@@ -35,7 +35,8 @@ export class GameController {
       this.camera,
       this.sceneManager,
       (newPosition: THREE.Vector3) => this.handleMove(newPosition),
-      (rotation: number) => this.handleRotation(rotation)
+      (rotation: number) => this.handleRotation(rotation),
+      this.gameState
     );
 
     this.setupEventListeners();

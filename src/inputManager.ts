@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { MovementControls, DragState } from "./types";
+import { MovementControls, DragState, GameState } from "./types";
 import { DRAG_THRESHOLD, CLICK_TIMEOUT } from "./constants";
 import { SceneManager } from "./sceneManager";
 
@@ -23,9 +23,9 @@ export class InputManager {
     private camera: THREE.Camera,
     private sceneManager: SceneManager,
     private onMove: (newPosition: THREE.Vector3) => void,
-    private onRotate: (rotation: number) => void
+    private onRotate: (rotation: number) => void,
+    private gameState: GameState
   ) {
-    this.setupEventListeners();
     this.setupEventListeners();
   }
 
@@ -80,13 +80,15 @@ export class InputManager {
   }
 
   private handleMouseDown(event: MouseEvent): void {
-    this.dragState = {
-      isDragging: true,
-      dragDistance: 0,
-      dragStartTime: Date.now(),
-      dragStartPosition: { x: event.clientX, y: event.clientY },
-      previousMousePosition: { x: event.clientX, y: event.clientY },
-    };
+    if (!this.gameState.isFullscreen) {
+      this.dragState = {
+        isDragging: true,
+        dragDistance: 0,
+        dragStartTime: Date.now(),
+        dragStartPosition: { x: event.clientX, y: event.clientY },
+        previousMousePosition: { x: event.clientX, y: event.clientY },
+      };
+    }
   }
 
   private handleMouseUp(event: MouseEvent): void {
@@ -104,7 +106,17 @@ export class InputManager {
   }
 
   private handleMouseMove(event: MouseEvent): void {
-    if (this.dragState.isDragging) {
+    if (this.gameState.isFullscreen && this.gameState.isPointerLocked) {
+      // 포인터가 락된 상태에서는 movementX/Y 사용
+      this.onRotate(
+        (event.movementX ||
+          (event as any).mozMovementX ||
+          (event as any).webkitMovementX ||
+          0) * 0.002
+      );
+    } else if (this.gameState.isFullscreen) {
+      this.onRotate(-(event.clientX / window.innerWidth - 0.5) * Math.PI * 2);
+    } else if (this.dragState.isDragging) {
       const deltaMove = {
         x: event.clientX - this.dragState.previousMousePosition.x,
         y: event.clientY - this.dragState.previousMousePosition.y,
@@ -123,6 +135,34 @@ export class InputManager {
         y: event.clientY,
       };
     }
+
+    // Show target indicator only when not in fullscreen and not dragging (or drag just started)
+    if (
+      !this.gameState.isFullscreen &&
+      (!this.dragState.isDragging ||
+        this.dragState.dragDistance < DRAG_THRESHOLD)
+    ) {
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2(
+        (event.clientX / window.innerWidth) * 2 - 1,
+        -(event.clientY / window.innerHeight) * 2 + 1
+      );
+
+      raycaster.setFromCamera(mouse, this.camera);
+      const intersects = raycaster.intersectObject(
+        this.sceneManager.getFloor()
+      );
+
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        this.sceneManager.updateTargetIndicator(point);
+      } else {
+        this.sceneManager.updateTargetIndicator(null);
+      }
+    } else {
+      // Hide indicator in fullscreen mode or while dragging
+      this.sceneManager.updateTargetIndicator(null);
+    }
   }
 
   private handleClick(event: MouseEvent): void {
@@ -133,7 +173,6 @@ export class InputManager {
     );
 
     raycaster.setFromCamera(mouse, this.camera);
-
     const intersects = raycaster.intersectObject(this.sceneManager.getFloor());
 
     if (intersects.length > 0) {
