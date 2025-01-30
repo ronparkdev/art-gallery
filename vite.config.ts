@@ -8,6 +8,7 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
+  publicDir: "public", // public 폴더 설정 추가
   build: {
     outDir: "dist",
     emptyOutDir: true,

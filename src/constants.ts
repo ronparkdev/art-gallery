@@ -12,12 +12,6 @@ export const PLAYER_CONFIG = {
   ROTATION_SPEED: 0.1,
 };
 
-export const WALL_CONFIG = {
-  DEFAULT_HEIGHT: 4,
-  COLOR: 0xffffff,
-  THICKNESS: 0.3,
-};
-
 export const ARTWORK_CONFIG = {
   WIDTH: 2,
   HEIGHT: 2,

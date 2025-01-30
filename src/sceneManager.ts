@@ -28,12 +28,26 @@ export const GALLERY_CONFIG = {
 
 export class SceneManager {
   private scene: THREE.Scene;
-  private floor: THREE.Group;
+  private floor!: THREE.Group;
   private walls: THREE.Mesh[] = [];
   private artworks: THREE.Group[] = [];
   private targetIndicator: THREE.Mesh;
+  private wallTexture: THREE.Texture;
 
   constructor() {
+    // TextureLoader 인스턴스 생성 및 텍스처 로드
+    const textureLoader = new THREE.TextureLoader();
+    this.wallTexture = textureLoader.load("/textures/wall.jpg", (texture) => {
+      // 텍스처 반복 설정
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 2); // 텍스처 반복 횟수 조정
+
+      // 텍스처 품질 설정
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+    });
+
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xf0f0f0);
     this.setupEnhancedLighting();
@@ -100,8 +114,6 @@ export class SceneManager {
     const ceilingGeometry = new THREE.PlaneGeometry(30, 30, 32, 32);
     const ceilingMaterial = new THREE.MeshPhongMaterial({
       color: 0xffffff,
-      roughness: 0.2,
-      metalness: 0.1,
     });
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceiling.position.y = GALLERY_CONFIG.WALL.HEIGHT;
@@ -157,22 +169,89 @@ export class SceneManager {
   private createWall(
     x: number,
     z: number,
-    width: number,
-    depth: number,
+    width1: number,
+    width2: number,
     height = GALLERY_CONFIG.WALL.HEIGHT
   ): THREE.Mesh {
-    const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-    const wallMaterial = new THREE.MeshPhongMaterial({
-      color: GALLERY_CONFIG.WALL.COLOR,
+    // 벽 geometry 생성
+    const wallGeometry = new THREE.BoxGeometry(width1, height, width2);
+
+    // UV 매핑 최적화
+    const uvAttribute = wallGeometry.attributes.uv;
+
+    // BoxGeometry의 UV는 다음과 같은 순서로 구성됩니다:
+    // 0-4: 전면 (앞)
+    // 4-8: 후면 (뒤)
+    // 8-12: 상단
+    // 12-16: 하단
+    // 16-20: 우측
+    // 20-24: 좌측
+
+    for (let i = 0; i < uvAttribute.count; i++) {
+      const vertexIndex = Math.floor(i / 4); // 각 면은 4개의 vertex로 구성
+      const faceIndex = Math.floor(vertexIndex); // 어떤 면인지 판단
+
+      let u = uvAttribute.getX(i);
+      let v = uvAttribute.getY(i);
+
+      // 면에 따라 다른 스케일 적용
+      if (faceIndex < 2) {
+        // 앞/뒤 면
+        // 높이와 너비 비율 유지
+        u *= width1; // 곱하기 사용
+        v *= height;
+      } else if (faceIndex < 4) {
+        // 위/아래 면
+        u *= width1;
+        v *= width2;
+      } else {
+        // 좌/우 면
+        // 높이와 깊이 비율 유지
+        u *= width2; // 곱하기 사용
+        v *= height;
+      }
+
+      // 텍스쳐 타일링을 위한 스케일 조정
+      const TILING_FACTOR = 0.2; // 텍스쳐 반복 횟수 조정
+      u *= TILING_FACTOR * 100;
+      v *= TILING_FACTOR;
+
+      uvAttribute.setXY(i, u, v);
+    }
+
+    // Second UV set for aoMap
+    wallGeometry.setAttribute("uv2", wallGeometry.attributes.uv.clone());
+
+    // Material 생성
+    const wallMaterial = new THREE.MeshStandardMaterial({
+      map: this.wallTexture,
       side: THREE.DoubleSide,
-      roughness: 0.8,
+
+      // PBR 속성
+      metalness: 0.0,
+      roughness: 1.0,
+      envMapIntensity: 1.0,
+
+      // 텍스쳐 강도 조정
+      normalScale: new THREE.Vector2(1, 1),
+      aoMapIntensity: 1.0,
     });
+
+    // 모든 텍스쳐에 대해 반복 설정
+    Object.values([this.wallTexture]).forEach((texture) => {
+      if (texture) {
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      }
+    });
+
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     wall.position.set(x, height / 2, z);
     wall.castShadow = true;
     wall.receiveShadow = true;
+
     this.scene.add(wall);
     this.walls.push(wall);
+
     return wall;
   }
 
@@ -216,8 +295,6 @@ export class SceneManager {
     );
     const frameMaterial = new THREE.MeshPhongMaterial({
       color: GALLERY_CONFIG.ARTWORK.FRAME_COLOR,
-      roughness: 0.3,
-      metalness: 0.7,
     });
     const frame = new THREE.Mesh(frameGeometry, frameMaterial);
 
