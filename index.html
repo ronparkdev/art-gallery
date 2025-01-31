@@ -2,27 +2,46 @@
 <html>
   <head>
     <title>Art Gallery</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <style>
       body {
         margin: 0;
         overflow: hidden;
+        touch-action: none;
       }
       canvas {
         display: block;
+        width: 100vw;
+        height: 100vh;
       }
       #fullscreen-btn {
         position: fixed;
         top: 20px;
         right: 20px;
         z-index: 100;
-        padding: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        background: rgba(255, 255, 255, 0.8);
+        border: none;
+        border-radius: 5px;
         cursor: pointer;
+        touch-action: manipulation;
+      }
+      @media (max-width: 768px) {
+        #fullscreen-btn {
+          top: 10px;
+          right: 10px;
+          padding: 8px 16px;
+          font-size: 14px;
+        }
       }
     </style>
   </head>
   <body>
     <button id="fullscreen-btn">Full View</button>
     <script type="module" src="src/main.ts"></script>
-    </script>
   </body>
 </html>
