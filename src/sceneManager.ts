@@ -16,7 +16,7 @@ export const GALLERY_CONFIG = {
     HEIGHT: 2.5,
     VERTICAL_POSITION: 2,
     WALL_OFFSET: 0.15,
-    FRAME_COLOR: 0x2c2c2c,
+    FRAME_COLOR: 0xffffff,
   },
   LIGHTING: {
     AMBIENT_INTENSITY: 0.4,
@@ -113,15 +113,74 @@ export class SceneManager {
     this.floor = this.createMarbleFloor();
     this.scene.add(this.floor);
 
-    // 고급스러운 천장 설치
-    const ceilingGeometry = new THREE.PlaneGeometry(30, 30, 32, 32);
-    const ceilingMaterial = new THREE.MeshPhongMaterial({
-      color: 0xffffff,
+    // 천장 그리드 생성
+    const gridSize = 3; // 그리드 하나의 크기
+    const totalWidth = 30;
+    const totalSegments = totalWidth / gridSize;
+
+    // 프레임 재질
+    const frameMaterial = new THREE.MeshPhongMaterial({
+      color: 0xdedede, // 회색 프레임
     });
-    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    ceiling.position.y = GALLERY_CONFIG.WALL.HEIGHT;
-    ceiling.rotation.x = Math.PI / 2;
-    this.scene.add(ceiling);
+
+    // 패널 재질
+    const panelMaterial = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+      shininess: 30,
+    });
+
+    const ceilingGroup = new THREE.Group();
+
+    const ceilingHeight = 2;
+
+    // 패널 생성
+    for (let x = 0; x < totalSegments; x++) {
+      for (let z = 0; z < totalSegments; z++) {
+        const panelGeometry = new THREE.PlaneGeometry(
+          gridSize - 0.2,
+          gridSize - 0.2
+        );
+        const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+
+        panel.position.set(
+          (x - totalSegments / 2) * gridSize + gridSize / 2,
+          GALLERY_CONFIG.WALL.HEIGHT + ceilingHeight / 2,
+          (z - totalSegments / 2) * gridSize + gridSize / 2
+        );
+        panel.rotation.x = Math.PI / 2;
+
+        ceilingGroup.add(panel);
+      }
+    }
+
+    // 그리드 프레임 생성
+    for (let i = 0; i <= totalSegments; i++) {
+      // 가로 프레임
+      const horizontalFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(totalWidth, ceilingHeight, 0.4),
+        frameMaterial
+      );
+      horizontalFrame.position.set(
+        0,
+        GALLERY_CONFIG.WALL.HEIGHT + ceilingHeight / 2,
+        (i - totalSegments / 2) * gridSize
+      );
+      ceilingGroup.add(horizontalFrame);
+
+      // 세로 프레임
+      const verticalFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, ceilingHeight, totalWidth),
+        frameMaterial
+      );
+      verticalFrame.position.set(
+        (i - totalSegments / 2) * gridSize,
+        GALLERY_CONFIG.WALL.HEIGHT + ceilingHeight / 2,
+        0
+      );
+      ceilingGroup.add(verticalFrame);
+    }
+
+    this.scene.add(ceilingGroup);
   }
 
   private setupWalls(): void {
@@ -144,7 +203,9 @@ export class SceneManager {
     const tilesPerSide = 30 / tileSize;
 
     const textureLoader = new THREE.TextureLoader();
-    const marbleTexture = textureLoader.load("textures/floor.jpg");
+    const marbleTexture = textureLoader.load(
+      `${import.meta.env.BASE_URL}textures/floor.jpg`
+    );
 
     marbleTexture.wrapS = THREE.RepeatWrapping;
     marbleTexture.wrapT = THREE.RepeatWrapping;
@@ -256,34 +317,51 @@ export class SceneManager {
 
   private setupArtwork(): void {
     const artLocations = [
-      { x: -14.8, z: -10, direction: "left" },
-      { x: -14.8, z: -5, direction: "left" },
-      { x: -14.8, z: 0, direction: "left" },
-      { x: -14.8, z: 5, direction: "left" },
-      { x: 14.8, z: -10, direction: "right" },
-      { x: 14.8, z: -5, direction: "right" },
-      { x: 14.8, z: 0, direction: "right" },
-      { x: 14.8, z: 5, direction: "right" },
-      { x: -5, z: -14.8, direction: "front" },
-      { x: 5, z: -14.8, direction: "front" },
-      { x: -5, z: 14.8, direction: "back" },
-      { x: 5, z: 14.8, direction: "back" },
+      // { x: -14.8, z: -10, direction: "left", imgPath: "textures/art1.jpg" },
+      // { x: -14.8, z: -5, direction: "left", imgPath: "textures/art1.jpg" },
+      // { x: -14.8, z: 0, direction: "left", imgPath: "textures/art1.jpg" },
+      // { x: -14.8, z: 5, direction: "left", imgPath: "textures/art1.jpg" },
+      // { x: 14.8, z: -10, direction: "right", imgPath: "textures/art1.jpg" },
+      // { x: 14.8, z: -5, direction: "right", imgPath: "textures/art1.jpg" },
+      // { x: 14.8, z: 0, direction: "right", imgPath: "textures/art1.jpg" },
+      // { x: 14.8, z: 5, direction: "right" , imgPath: "textures/art1.jpg"},
+      { x: -5, z: -14.8, direction: "front", imgPath: "textures/art1.jpg" },
+      { x: 5, z: -14.8, direction: "front", imgPath: "textures/art2.jpg" },
+      { x: -5, z: 14.8, direction: "back", imgPath: "textures/art3.jpg" },
+      { x: 5, z: 14.8, direction: "back", imgPath: "textures/art1.jpg" },
     ];
 
     artLocations.forEach((loc) => {
       this.addArtwork(
         loc.x,
         loc.z,
-        loc.direction as "front" | "back" | "left" | "right"
+        loc.direction as "front" | "back" | "left" | "right",
+        loc.imgPath
+      );
+    });
+  }
+  // loadTexture 함수 추가
+  private loadTexture(url: string): Promise<THREE.Texture> {
+    return new Promise((resolve, reject) => {
+      new THREE.TextureLoader().load(
+        url,
+        (texture) => {
+          resolve(texture);
+        },
+        undefined,
+        (error) => {
+          reject(error);
+        }
       );
     });
   }
 
-  private addArtwork(
+  private async addArtwork(
     x: number,
     z: number,
-    wallDirection: "front" | "back" | "left" | "right"
-  ): void {
+    wallDirection: "front" | "back" | "left" | "right",
+    imgPath: string
+  ): Promise<void> {
     const artworkGroup = new THREE.Group();
 
     // 프레임 생성
@@ -298,16 +376,31 @@ export class SceneManager {
     const frame = new THREE.Mesh(frameGeometry, frameMaterial);
 
     // 캔버스 생성
-    const canvasGeometry = new THREE.PlaneGeometry(
-      GALLERY_CONFIG.ARTWORK.WIDTH,
-      GALLERY_CONFIG.ARTWORK.HEIGHT
-    );
+    const canvasGeometry = new THREE.PlaneGeometry(1, 1); // 초기 크기를 1x1로 설정
     const canvasMaterial = new THREE.MeshPhongMaterial({
-      color: this.getRandomArtworkColor(),
+      color: 0xffffff, // 흰색으로 설정
       side: THREE.DoubleSide,
     });
     const canvas = new THREE.Mesh(canvasGeometry, canvasMaterial);
-    canvas.position.z = 0.01;
+    canvas.position.z = 0.051;
+
+    // 이미지 텍스처 로드 및 적용
+    try {
+      const texture = await this.loadTexture(
+        `${import.meta.env.BASE_URL}${imgPath}`
+      );
+
+      canvasMaterial.map = texture;
+      canvasMaterial.needsUpdate = true;
+
+      canvasGeometry.scale(
+        GALLERY_CONFIG.ARTWORK.WIDTH,
+        GALLERY_CONFIG.ARTWORK.HEIGHT,
+        1
+      );
+    } catch (error) {
+      console.error("Error loading texture:", error);
+    }
 
     artworkGroup.add(frame);
     artworkGroup.add(canvas);
@@ -339,14 +432,6 @@ export class SceneManager {
     artworkGroup.position.copy(position);
     this.scene.add(artworkGroup);
     this.artworks.push(artworkGroup);
-  }
-
-  private getRandomArtworkColor(): number {
-    const colors = [
-      0x2c3e50, 0xe74c3c, 0x3498db, 0x2ecc71, 0xf1c40f, 0x9b59b6, 0x1abc9c,
-      0xe67e22,
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
   }
 
   private setupDecorations(): void {
