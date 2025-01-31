@@ -143,14 +143,18 @@ export class SceneManager {
     const tileSize = GALLERY_CONFIG.FLOOR.TILE_SIZE;
     const tilesPerSide = 30 / tileSize;
 
+    const textureLoader = new THREE.TextureLoader();
+    const marbleTexture = textureLoader.load("textures/floor.jpg");
+
+    marbleTexture.wrapS = THREE.RepeatWrapping;
+    marbleTexture.wrapT = THREE.RepeatWrapping;
+    marbleTexture.repeat.set(1, 1);
+
     for (let x = 0; x < tilesPerSide; x++) {
       for (let z = 0; z < tilesPerSide; z++) {
-        const isOffset = (x + z) % 2 === 0;
         const tileGeometry = new THREE.PlaneGeometry(tileSize, tileSize);
         const tileMaterial = new THREE.MeshPhongMaterial({
-          color: isOffset
-            ? GALLERY_CONFIG.FLOOR.PRIMARY_COLOR
-            : GALLERY_CONFIG.FLOOR.SECONDARY_COLOR,
+          map: marbleTexture,
           shininess: 100,
         });
 
@@ -182,14 +186,6 @@ export class SceneManager {
     // UV 매핑 최적화
     const uvAttribute = wallGeometry.attributes.uv;
 
-    // BoxGeometry의 UV는 다음과 같은 순서로 구성됩니다:
-    // 0-4: 전면 (앞)
-    // 4-8: 후면 (뒤)
-    // 8-12: 상단
-    // 12-16: 하단
-    // 16-20: 우측
-    // 20-24: 좌측
-
     for (let i = 0; i < uvAttribute.count; i++) {
       const vertexIndex = Math.floor(i / 4); // 각 면은 4개의 vertex로 구성
       const faceIndex = Math.floor(vertexIndex); // 어떤 면인지 판단
@@ -201,7 +197,7 @@ export class SceneManager {
       if (faceIndex < 2) {
         // 앞/뒤 면
         // 높이와 너비 비율 유지
-        u *= width1; // 곱하기 사용
+        u *= width2; // 곱하기 사용
         v *= height;
       } else if (faceIndex < 4) {
         // 위/아래 면
@@ -210,13 +206,13 @@ export class SceneManager {
       } else {
         // 좌/우 면
         // 높이와 깊이 비율 유지
-        u *= width2; // 곱하기 사용
+        u *= width1; // 곱하기 사용
         v *= height;
       }
 
       // 텍스쳐 타일링을 위한 스케일 조정
       const TILING_FACTOR = 0.2; // 텍스쳐 반복 횟수 조정
-      u *= TILING_FACTOR * 100;
+      u *= TILING_FACTOR;
       v *= TILING_FACTOR;
 
       uvAttribute.setXY(i, u, v);
