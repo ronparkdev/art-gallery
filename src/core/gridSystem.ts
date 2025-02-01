@@ -7,12 +7,8 @@ export class GridSystem {
   private grid: Node[][] = []
   private walls: THREE.Mesh[] = []
 
-  constructor(walls: THREE.Mesh[]) {
+  public initializeGrid(walls: THREE.Mesh[]): void {
     this.walls = walls
-    this.initGrid()
-  }
-
-  private initGrid(): void {
     const TOTAL_RADIUS = PLAYER_CONFIG.RADIUS + PLAYER_CONFIG.SAFETY_BUFFER
 
     for (let x = 0; x < GRID_WIDTH; x++) {

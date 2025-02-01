@@ -30,7 +30,7 @@ export class GameController {
     this.setupRenderer()
     this.setupCamera()
     this.sceneManager = new SceneManager()
-    this.gridSystem = new GridSystem(this.sceneManager.getWalls())
+    this.gridSystem = new GridSystem()
     this.pathFinder = new PathFinder(this.gridSystem)
     // Initialize input manager with correct parameter order
     this.inputManager = new InputManager(
@@ -43,6 +43,10 @@ export class GameController {
 
     this.setupEventListeners()
     this.animate()
+
+    this.sceneManager.initializeScene().then(() => {
+      this.gridSystem.initializeGrid(this.sceneManager.getWalls())
+    })
   }
 
   private setupRenderer(): void {
