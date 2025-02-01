@@ -1,22 +1,22 @@
-import { defineConfig } from "vite";
-import { resolve } from "path";
+import { defineConfig } from 'vite'
+import { resolve } from 'path'
 
 export default defineConfig({
-  base: process.env.BASE_URL || "/",
+  base: process.env.BASE_URL || '/',
   resolve: {
     alias: {
-      "@": resolve(__dirname, "src"),
+      '@': resolve(__dirname, 'src'),
     },
   },
-  publicDir: "public", // public 폴더 설정 추가
+  publicDir: 'public', // public 폴더 설정 추가
   build: {
-    outDir: "dist",
+    outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          three: ["three"],
+          three: ['three'],
         },
       },
     },
@@ -25,4 +25,4 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
-});
+})
