@@ -9,17 +9,32 @@ export class PathFinder {
   constructor(private gridSystem: GridSystem) {}
 
   public findPath(startPos: THREE.Vector3, targetPos: THREE.Vector3): THREE.Vector3[] | null {
-    // First try direct path
-    if (this.isDirectPathClear(startPos, targetPos)) {
-      return [startPos, targetPos]
+    // Get nearest walkable positions if current positions are not walkable
+    const nearestStartPos = this.getNearestWalkablePosition(startPos)
+    const nearestTargetPos = this.getNearestWalkablePosition(targetPos)
+
+    if (!nearestStartPos || !nearestTargetPos) {
+      return null // No walkable position found within search radius
+    }
+
+    // If start position was unwalkable, add it to the beginning of the path
+    const prePath: THREE.Vector3[] = []
+    if (!startPos.equals(nearestStartPos)) {
+      prePath.push(startPos)
+    }
+
+    // First try direct path from nearest walkable positions
+    if (this.isDirectPathClear(nearestStartPos, nearestTargetPos)) {
+      return [...prePath, nearestStartPos, nearestTargetPos]
     }
 
     // If direct path fails, try A* pathfinding
-    const path = this.findAStarPath(startPos, targetPos)
+    const path = this.findAStarPath(nearestStartPos, nearestTargetPos)
     if (!path) return null
 
-    // Simplify the found path
-    return this.simplifyPath(path)
+    // Simplify the found path and combine with prePath
+    const simplifiedPath = this.simplifyPath(path)
+    return [...prePath, ...simplifiedPath]
   }
 
   private isDirectPathClear(start: THREE.Vector3, end: THREE.Vector3): boolean {
@@ -77,6 +92,54 @@ export class PathFinder {
             openSet.push(neighbor)
           }
         }
+      }
+    }
+
+    return null
+  }
+
+  private getNearestWalkablePosition(position: THREE.Vector3): THREE.Vector3 | null {
+    // If the current position is already walkable, return it
+    if (
+      this.gridSystem.isPositionWalkable(position.x, position.z, PLAYER_CONFIG.RADIUS + PLAYER_CONFIG.SAFETY_BUFFER)
+    ) {
+      return position.clone()
+    }
+
+    // Convert to grid coordinates
+    const gridPos = this.gridSystem.worldToGrid(position.x, position.z)
+    const searchRadius = 5 // Adjust this value based on your needs
+
+    let nearestNode: Node = null!
+    let minDistance = Infinity
+
+    // Search in expanding squares around the position
+    for (let r = 1; r <= searchRadius; r++) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dz = -r; dz <= r; dz++) {
+          // Only check positions on the current square perimeter
+          if (Math.abs(dx) < r && Math.abs(dz) < r) continue
+
+          const checkX = gridPos.x + dx
+          const checkZ = gridPos.z + dz
+          const node = this.gridSystem.getNode(checkX, checkZ)
+
+          if (node?.walkable) {
+            const worldPos = this.gridSystem.gridToWorld(checkX, checkZ)
+            const distance = new THREE.Vector3(worldPos.x, position.y, worldPos.z).distanceTo(position)
+
+            if (distance < minDistance) {
+              minDistance = distance
+              nearestNode = node
+            }
+          }
+        }
+      }
+
+      // If we found a walkable position in this radius, no need to search further
+      if (nearestNode !== null) {
+        const worldPos = this.gridSystem.gridToWorld(nearestNode.x, nearestNode.z)
+        return new THREE.Vector3(worldPos.x, position.y, worldPos.z)
       }
     }
 
