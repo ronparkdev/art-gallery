@@ -16,6 +16,8 @@ export class GameController {
   private pathFinder: PathFinder
   private inputManager: InputManager
 
+  private moveStartTime: number = 0
+
   private gameState: GameState = {
     isFullscreen: false,
     isPointerLocked: false,
@@ -167,6 +169,7 @@ export class GameController {
 
       if (this.gameState.currentPath.length > 0) {
         this.gameState.isMoving = true
+        this.moveStartTime = performance.now() // 움직임 시작 시간 저장
       }
     }
   }
@@ -182,19 +185,39 @@ export class GameController {
 
       // Calculate desired rotation based on movement direction
       const direction = new THREE.Vector3().subVectors(currentTarget, this.camera.position).normalize()
-
-      // Change the target angle calculation (add PI to reverse direction)
       const targetAngle = Math.atan2(-direction.x, -direction.z)
 
-      // Smoothly rotate camera towards movement direction
-      const rotationDiff = targetAngle - this.camera.rotation.y
+      // Get current rotation in range [0, 2PI]
+      let currentRotation = this.camera.rotation.y % (2 * Math.PI)
+      if (currentRotation < 0) currentRotation += 2 * Math.PI
 
-      // Normalize the rotation difference to [-PI, PI]
-      let normalizedDiff = rotationDiff
-      while (normalizedDiff > Math.PI) normalizedDiff -= 2 * Math.PI
-      while (normalizedDiff < -Math.PI) normalizedDiff += 2 * Math.PI
+      // Get target rotation in range [0, 2PI]
+      let normalizedTargetAngle = targetAngle
+      if (normalizedTargetAngle < 0) normalizedTargetAngle += 2 * Math.PI
 
-      this.gameState.targetRotationY = this.camera.rotation.y + normalizedDiff
+      // Calculate rotation difference
+      let rotationDiff = normalizedTargetAngle - currentRotation
+
+      // Ensure we take the shortest path
+      if (rotationDiff > Math.PI) {
+        rotationDiff -= 2 * Math.PI
+      } else if (rotationDiff < -Math.PI) {
+        rotationDiff += 2 * Math.PI
+      }
+
+      // Calculate acceleration based on elapsed time
+      const elapsedTime = (performance.now() - this.moveStartTime) / 1000 // 초 단위로 변환
+      const ACCELERATION_DURATION = 0.5 // 가속 시간 (초)
+      const ROTATION_MAX_SPEED = 0.2
+
+      // Smooth acceleration curve using easeInOutQuad
+      const accelerationProgress = Math.min(elapsedTime / ACCELERATION_DURATION, 1)
+
+      // Apply acceleration to rotation speed
+      const rotationSpeed = ROTATION_MAX_SPEED * accelerationProgress
+
+      // Apply rotation
+      this.gameState.targetRotationY = this.camera.rotation.y + rotationDiff * rotationSpeed
 
       if (distance > 0.1) {
         const speed = PLAYER_CONFIG.MOVEMENT_SPEED
@@ -205,11 +228,14 @@ export class GameController {
           this.camera.position.copy(newPosition)
         } else {
           this.gameState.currentPath.shift()
+          this.moveStartTime = performance.now() // Reset acceleration for new path segment
         }
       } else {
         this.gameState.currentPath.shift()
         if (this.gameState.currentPath.length === 0) {
           this.gameState.isMoving = false
+        } else {
+          this.moveStartTime = performance.now() // Reset acceleration for new path segment
         }
       }
     }
@@ -242,10 +268,7 @@ export class GameController {
   }
 
   private updateRotation(): void {
-    this.camera.rotation.y +=
-      (this.gameState.targetRotationY - this.camera.rotation.y) *
-      PLAYER_CONFIG.ROTATION_SPEED *
-      (this.gameState.isMoving ? 0.3 : 1)
+    this.camera.rotation.y = this.gameState.targetRotationY
   }
 
   private animate = (): void => {
