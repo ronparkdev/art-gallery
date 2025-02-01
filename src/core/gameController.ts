@@ -205,22 +205,28 @@ export class GameController {
         rotationDiff += 2 * Math.PI
       }
 
-      // Calculate acceleration based on elapsed time
-      const elapsedTime = (performance.now() - this.moveStartTime) / 1000 // 초 단위로 변환
-      const ACCELERATION_DURATION = 0.5 // 가속 시간 (초)
+      // Calculate linear acceleration for rotation
+      const elapsedTime = (performance.now() - this.moveStartTime) / 1000
+      const ROTATION_ACCELERATION_DURATION = 0.5
       const ROTATION_MAX_SPEED = 0.2
 
-      // Smooth acceleration curve using easeInOutQuad
-      const accelerationProgress = Math.min(elapsedTime / ACCELERATION_DURATION, 1)
-
-      // Apply acceleration to rotation speed
-      const rotationSpeed = ROTATION_MAX_SPEED * accelerationProgress
+      // Linear acceleration for rotation
+      const rotationProgress = Math.min(elapsedTime / ROTATION_ACCELERATION_DURATION, 1)
+      const rotationSpeed = ROTATION_MAX_SPEED * rotationProgress
 
       // Apply rotation
       this.gameState.targetRotationY = this.camera.rotation.y + rotationDiff * rotationSpeed
 
       if (distance > 0.1) {
-        const speed = PLAYER_CONFIG.MOVEMENT_SPEED
+        // Calculate movement speed with easeInOutQuad
+        const MOVEMENT_ACCELERATION_DURATION = 0.8 // 이동 가속/감속 시간
+        const movementProgress = Math.min(elapsedTime / MOVEMENT_ACCELERATION_DURATION, 1)
+        const easeInOutQuad =
+          movementProgress < 0.5
+            ? 2 * movementProgress * movementProgress
+            : 1 - Math.pow(-2 * movementProgress + 2, 2) / 2
+
+        const speed = PLAYER_CONFIG.MOVEMENT_SPEED * easeInOutQuad
         const movement = direction.multiplyScalar(speed)
         const newPosition = this.camera.position.clone().add(movement)
 
@@ -228,14 +234,14 @@ export class GameController {
           this.camera.position.copy(newPosition)
         } else {
           this.gameState.currentPath.shift()
-          this.moveStartTime = performance.now() // Reset acceleration for new path segment
+          this.moveStartTime = performance.now()
         }
       } else {
         this.gameState.currentPath.shift()
         if (this.gameState.currentPath.length === 0) {
           this.gameState.isMoving = false
         } else {
-          this.moveStartTime = performance.now() // Reset acceleration for new path segment
+          this.moveStartTime = performance.now()
         }
       }
     }
