@@ -208,6 +208,13 @@ export class SceneManager {
           artworkGroup.position.z -= DIMENSIONS.WALL_OFFSET
           artworkGroup.rotation.y = Math.PI
           break
+        case 'left':
+          artworkGroup.position.x += DIMENSIONS.WALL_OFFSET
+          artworkGroup.rotation.y = Math.PI / 2
+          break
+        case 'right':
+          artworkGroup.position.x -= DIMENSIONS.WALL_OFFSET
+          artworkGroup.rotation.y = -Math.PI / 2
       }
 
       this.scene.add(artworkGroup)

@@ -1,3 +1,5 @@
+// src/constants/sceneStructure.ts
+
 export const SCENE_STRUCTURE = {
   // 주 갤러리 공간 크기
   SPACE: {
@@ -70,29 +72,180 @@ export const SCENE_STRUCTURE = {
     DIMENSIONS: {
       WIDTH: 2,
       HEIGHT: 2.5,
-      WALL_OFFSET: 0.15, // 벽으로부터의 거리
+      WALL_OFFSET: 0.065, // 벽으로부터의 거리
     },
     DISPLAY_HEIGHT: 2, // 바닥으로부터의 높이
     ITEMS: [
+      // 전면 벽 작품들
       {
-        position: { x: -5, z: -14.8 },
+        position: { x: -12, z: -14.8 },
         direction: 'front',
         imageUrl: 'textures/art1.jpg',
       },
       {
-        position: { x: 5, z: -14.8 },
+        position: { x: -8, z: -14.8 },
         direction: 'front',
         imageUrl: 'textures/art2.jpg',
       },
       {
-        position: { x: -5, z: 14.8 },
+        position: { x: -4, z: -14.8 },
+        direction: 'front',
+        imageUrl: 'textures/art3.jpg',
+      },
+      {
+        position: { x: 4, z: -14.8 },
+        direction: 'front',
+        imageUrl: 'textures/art1.jpg',
+      },
+      {
+        position: { x: 8, z: -14.8 },
+        direction: 'front',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: 12, z: -14.8 },
+        direction: 'front',
+        imageUrl: 'textures/art3.jpg',
+      },
+
+      // 후면 벽 작품들
+      {
+        position: { x: -12, z: 14.8 },
+        direction: 'back',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: -8, z: 14.8 },
         direction: 'back',
         imageUrl: 'textures/art3.jpg',
       },
       {
-        position: { x: 5, z: 14.8 },
+        position: { x: -4, z: 14.8 },
         direction: 'back',
         imageUrl: 'textures/art1.jpg',
+      },
+      {
+        position: { x: 4, z: 14.8 },
+        direction: 'back',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: 8, z: 14.8 },
+        direction: 'back',
+        imageUrl: 'textures/art3.jpg',
+      },
+      {
+        position: { x: 12, z: 14.8 },
+        direction: 'back',
+        imageUrl: 'textures/art1.jpg',
+      },
+
+      // 좌측 벽 작품들
+      {
+        position: { x: -14.8, z: -12 },
+        direction: 'left',
+        imageUrl: 'textures/art1.jpg',
+      },
+      {
+        position: { x: -14.8, z: -8 },
+        direction: 'left',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: -14.8, z: 0 },
+        direction: 'left',
+        imageUrl: 'textures/art3.jpg',
+      },
+      {
+        position: { x: -14.8, z: 4 },
+        direction: 'left',
+        imageUrl: 'textures/art1.jpg',
+      },
+      {
+        position: { x: -14.8, z: 8 },
+        direction: 'left',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: -14.8, z: 12 },
+        direction: 'left',
+        imageUrl: 'textures/art3.jpg',
+      },
+
+      // 우측 벽 작품들
+      {
+        position: { x: 14.8, z: -12 },
+        direction: 'right',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: 14.8, z: -8 },
+        direction: 'right',
+        imageUrl: 'textures/art3.jpg',
+      },
+      {
+        position: { x: 14.8, z: -4 },
+        direction: 'right',
+        imageUrl: 'textures/art1.jpg',
+      },
+      {
+        position: { x: 14.8, z: 0 },
+        direction: 'right',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: 14.8, z: 8 },
+        direction: 'right',
+        imageUrl: 'textures/art3.jpg',
+      },
+      {
+        position: { x: 14.8, z: 12 },
+        direction: 'right',
+        imageUrl: 'textures/art1.jpg',
+      },
+
+      // 내부 벽 작품들 - 왼쪽 수직벽
+      {
+        position: { x: -5.15, z: -2 },
+        direction: 'right',
+        imageUrl: 'textures/art1.jpg',
+      },
+      {
+        position: { x: -5.15, z: 2 },
+        direction: 'right',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: -4.85, z: -2 },
+        direction: 'left',
+        imageUrl: 'textures/art3.jpg',
+      },
+      {
+        position: { x: -4.85, z: 2 },
+        direction: 'left',
+        imageUrl: 'textures/art1.jpg',
+      },
+
+      // 내부 벽 작품들 - 오른쪽 수직벽
+      {
+        position: { x: 5.15, z: -2 },
+        direction: 'left',
+        imageUrl: 'textures/art2.jpg',
+      },
+      {
+        position: { x: 5.15, z: 2 },
+        direction: 'left',
+        imageUrl: 'textures/art3.jpg',
+      },
+      {
+        position: { x: 4.85, z: -2 },
+        direction: 'right',
+        imageUrl: 'textures/art1.jpg',
+      },
+      {
+        position: { x: 4.85, z: 2 },
+        direction: 'right',
+        imageUrl: 'textures/art2.jpg',
       },
     ],
   },
