@@ -23,8 +23,9 @@ export class InputManager {
 
   private isMobile: boolean
   private joystick: VirtualJoystick | null = null
-  private rightTouchId: number | null = null
-  private lastRightTouchX: number = 0
+  private rotationTouchId: number | null = null
+  private lastTouchX: number = 0
+  private joystickRect: DOMRect | null = null
 
   constructor(
     private camera: THREE.Camera,
@@ -71,30 +72,58 @@ export class InputManager {
     // Setup right side touch handling for rotation
     document.addEventListener('touchstart', (e: TouchEvent) => {
       const touch = e.touches[0]
-      const halfWidth = window.innerWidth / 2
 
-      if (touch.clientX > halfWidth && this.rightTouchId === null) {
-        this.rightTouchId = touch.identifier
-        this.lastRightTouchX = touch.clientX
+      // Get joystick area
+      if (this.joystick) {
+        const joystickElement = this.joystick.getElement()
+        this.joystickRect = joystickElement.getBoundingClientRect()
+      }
+
+      // Check if touch is in joystick area
+      if (this.joystickRect && this.isInJoystickArea(touch.clientX, touch.clientY)) {
+        return // Don't handle rotation for joystick area
+      }
+
+      if (this.rotationTouchId === null) {
+        this.rotationTouchId = touch.identifier
+        this.lastTouchX = touch.clientX
       }
     })
 
     document.addEventListener('touchmove', (e: TouchEvent) => {
-      if (this.rightTouchId !== null) {
-        const touch = Array.from(e.touches).find(t => t.identifier === this.rightTouchId)
+      if (this.rotationTouchId !== null) {
+        const touch = Array.from(e.touches).find(t => t.identifier === this.rotationTouchId)
         if (touch) {
-          const deltaX = touch.clientX - this.lastRightTouchX
+          // Check if touch is in joystick area
+          if (this.joystickRect && this.isInJoystickArea(touch.clientX, touch.clientY)) {
+            return
+          }
+
+          const deltaX = touch.clientX - this.lastTouchX
           this.onRotate(deltaX * -0.01)
-          this.lastRightTouchX = touch.clientX
+          this.lastTouchX = touch.clientX
         }
       }
     })
 
     document.addEventListener('touchend', (e: TouchEvent) => {
-      if (Array.from(e.changedTouches).some(t => t.identifier === this.rightTouchId)) {
-        this.rightTouchId = null
+      if (Array.from(e.changedTouches).some(t => t.identifier === this.rotationTouchId)) {
+        this.rotationTouchId = null
       }
     })
+  }
+
+  private isInJoystickArea(x: number, y: number): boolean {
+    if (!this.joystickRect) return false
+
+    // Add some padding around the joystick area (50px)
+    const padding = 50
+    return (
+      x >= this.joystickRect.left - padding &&
+      x <= this.joystickRect.right + padding &&
+      y >= this.joystickRect.top - padding &&
+      y <= this.joystickRect.bottom + padding
+    )
   }
 
   private setupDesktopControls(): void {

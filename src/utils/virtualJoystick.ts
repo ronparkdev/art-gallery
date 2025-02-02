@@ -134,6 +134,10 @@ export class VirtualJoystick {
     }
   }
 
+  public getElement(): HTMLDivElement {
+    return this.joystickContainer
+  }
+
   public show(): void {
     this.joystickContainer.style.display = 'block'
   }
