@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 
+import { SCENE_STRUCTURE } from '@/constants/sceneStructure'
+import { GeometryUtils } from '@/utils/geometry'
 import { MaterialUtils } from '@/utils/material'
 import { TextureUtils } from '@/utils/texture'
-import { GeometryUtils } from '@/utils/geometry'
-import { SCENE_STRUCTURE } from '@/constants/sceneStructure'
 
 export class SceneManager {
   private scene: THREE.Scene
@@ -165,32 +165,32 @@ export class SceneManager {
   private async setupArtworks(): Promise<void> {
     const { ITEMS, DIMENSIONS, DISPLAY_HEIGHT } = SCENE_STRUCTURE.ARTWORKS
 
+    // 기본 캔버스 재질 (회색)
+    const defaultCanvasMaterial = new THREE.MeshPhongMaterial({
+      color: 0xefefef,
+      side: THREE.DoubleSide,
+    })
+
+    // 프레임 재질
+    const frameMaterial = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+    })
+
     for (const artwork of ITEMS) {
       const artworkGroup = new THREE.Group()
 
       // Frame
       const frame = new THREE.Mesh(
         new THREE.BoxGeometry(DIMENSIONS.WIDTH + 0.2, DIMENSIONS.HEIGHT + 0.2, 0.1),
-        new THREE.MeshPhongMaterial({ color: 0xffffff }),
+        frameMaterial,
       )
 
-      // Canvas
+      // Canvas - 기본적으로 회색으로 초기화
       const canvas = new THREE.Mesh(
         new THREE.PlaneGeometry(DIMENSIONS.WIDTH, DIMENSIONS.HEIGHT),
-        new THREE.MeshPhongMaterial({
-          color: 0xffffff,
-          side: THREE.DoubleSide,
-        }),
+        defaultCanvasMaterial.clone(), // 각 캔버스마다 새로운 재질 인스턴스 사용
       )
       canvas.position.z = 0.051
-
-      try {
-        const texture = await TextureUtils.loadTexture(`${import.meta.env.BASE_URL}${artwork.imageUrl}`)
-        ;(canvas.material as THREE.MeshPhongMaterial).map = texture
-        canvas.material.needsUpdate = true
-      } catch (error) {
-        console.error('Error loading artwork texture:', error)
-      }
 
       artworkGroup.add(frame, canvas)
 
@@ -217,6 +217,21 @@ export class SceneManager {
 
       this.scene.add(artworkGroup)
       this.artworks.push(artworkGroup)
+
+      void (async () => {
+        // 텍스처 로딩 시도
+        try {
+          const texture = await TextureUtils.loadTexture(`${import.meta.env.BASE_URL}${artwork.imageUrl}`)
+          const texturedMaterial = new THREE.MeshPhongMaterial({
+            map: texture,
+            side: THREE.DoubleSide,
+          })
+          canvas.material = texturedMaterial
+        } catch (error) {
+          console.warn(`Failed to load artwork texture: ${artwork.imageUrl}`, error)
+          // 로딩 실패 시 기본 회색 재질 유지
+        }
+      })()
     }
   }
 
