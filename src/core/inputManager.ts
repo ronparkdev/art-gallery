@@ -62,14 +62,11 @@ export class InputManager {
   }
 
   private setupMobileControls(): void {
-    // Initialize virtual joystick with smooth value handling
+    // 조이스틱 초기화
     this.joystick = new VirtualJoystick((x: number, y: number) => {
-      // Store raw joystick values
       this.joystickVector.x = x
       this.joystickVector.y = y
 
-      // Set boolean flags for basic direction control
-      // 현재는 0.1을 임계값으로 사용하여 좀 더 섬세한 조작이 가능하도록 함
       this.controls.moveForward = y < -0.1
       this.controls.moveBackward = y > 0.1
       this.controls.moveLeft = x < -0.1
@@ -78,32 +75,33 @@ export class InputManager {
 
     this.updateJoystickVisibility()
 
-    // Setup right side touch handling for rotation
+    // 터치 이벤트 핸들링
     document.addEventListener('touchstart', (e: TouchEvent) => {
-      const touch = e.touches[0]
       if (this.joystick) {
         const joystickElement = this.joystick.getElement()
         this.joystickRect = joystickElement.getBoundingClientRect()
       }
 
-      if (this.joystickRect && this.isInJoystickArea(touch.clientX, touch.clientY)) {
-        return
-      }
-
-      if (this.rotationTouchId === null) {
-        this.rotationTouchId = touch.identifier
-        this.lastTouchX = touch.clientX
+      // 새로운 터치가 조이스틱 영역에 있는지 확인
+      for (let i = 0; i < e.touches.length; i++) {
+        const touch = e.touches[i]
+        if (!this.isInJoystickArea(touch.clientX, touch.clientY)) {
+          // 조이스틱 영역 밖의 터치이고, 아직 회전 터치가 없다면
+          if (this.rotationTouchId === null) {
+            this.rotationTouchId = touch.identifier
+            this.lastTouchX = touch.clientX
+          }
+        }
       }
     })
 
     document.addEventListener('touchmove', (e: TouchEvent) => {
-      if (this.rotationTouchId !== null) {
-        const touch = Array.from(e.touches).find(t => t.identifier === this.rotationTouchId)
-        if (touch) {
-          if (this.joystickRect && this.isInJoystickArea(touch.clientX, touch.clientY)) {
-            return
-          }
+      // 현재의 모든 터치를 순회
+      for (let i = 0; i < e.touches.length; i++) {
+        const touch = e.touches[i]
 
+        // 회전 터치 업데이트
+        if (touch.identifier === this.rotationTouchId) {
           const deltaX = touch.clientX - this.lastTouchX
           this.onRotate(deltaX * -0.01)
           this.lastTouchX = touch.clientX
@@ -112,8 +110,24 @@ export class InputManager {
     })
 
     document.addEventListener('touchend', (e: TouchEvent) => {
-      if (Array.from(e.changedTouches).some(t => t.identifier === this.rotationTouchId)) {
-        this.rotationTouchId = null
+      // 종료된 터치들 중에 회전 터치가 있는지 확인
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i]
+        if (touch.identifier === this.rotationTouchId) {
+          this.rotationTouchId = null
+          break
+        }
+      }
+    })
+
+    document.addEventListener('touchcancel', (e: TouchEvent) => {
+      // touchend와 동일한 처리
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i]
+        if (touch.identifier === this.rotationTouchId) {
+          this.rotationTouchId = null
+          break
+        }
       }
     })
   }
@@ -121,7 +135,6 @@ export class InputManager {
   private isInJoystickArea(x: number, y: number): boolean {
     if (!this.joystickRect) return false
 
-    // Add some padding around the joystick area (50px)
     const padding = 50
     return (
       x >= this.joystickRect.left - padding &&
