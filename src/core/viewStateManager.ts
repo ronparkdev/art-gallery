@@ -41,6 +41,12 @@ export class ViewStateManager {
     if (fullscreenBtn) {
       fullscreenBtn.textContent = this.gameState.isFullscreen ? 'Exit Full View' : 'Full View'
     }
+
+    if (this.gameState.isFullscreen && !this.gameState.isPointerLocked) {
+      this.requestPointerLock()
+    } else if (!this.gameState.isFullscreen && this.gameState.isPointerLocked) {
+      this.exitPointerLock()
+    }
   }
 
   public handlePointerLockChange(): void {
