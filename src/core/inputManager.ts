@@ -5,6 +5,15 @@ import { SceneManager } from '@/scene/sceneManager'
 import { MovementControls, DragState, GameState } from '@/types'
 import { VirtualJoystick } from '@/utils/virtualJoystick'
 
+declare global {
+  interface MouseEvent {
+    mozMovementX?: number
+    mozMovementY?: number
+    webkitMovementX?: number
+    webkitMovementY?: number
+  }
+}
+
 export class InputManager {
   private controls: MovementControls = {
     moveForward: false,
@@ -231,7 +240,7 @@ export class InputManager {
 
   private handleMouseMove(event: MouseEvent): void {
     if (this.gameState.isFullscreen && this.gameState.isPointerLocked) {
-      this.onRotate((event.movementX || (event as any).mozMovementX || (event as any).webkitMovementX || 0) * 0.002)
+      this.onRotate((event.movementX || event.mozMovementX || event.webkitMovementX || 0) * 0.002)
     } else if (this.gameState.isFullscreen) {
       this.onRotate(-(event.clientX / window.innerWidth - 0.5) * Math.PI * 2)
     } else if (this.dragState.isDragging) {
