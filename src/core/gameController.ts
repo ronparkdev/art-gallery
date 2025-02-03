@@ -243,41 +243,38 @@ export class GameController {
       const controls = this.inputManager.getMovementControls()
       this.gameState.velocity.set(0, 0, 0)
 
-      if (controls.moveForward || controls.moveBackward || controls.moveLeft || controls.moveRight) {
-        const direction = new THREE.Vector3()
-        this.camera.getWorldDirection(direction)
-        const forward = direction.clone()
-        const right = new THREE.Vector3(-direction.z, 0, direction.x)
+      const direction = new THREE.Vector3()
+      this.camera.getWorldDirection(direction)
+      const forward = direction.clone()
+      const right = new THREE.Vector3(-direction.z, 0, direction.x)
 
-        const BASE_SPEED = PLAYER_CONFIG.MOVEMENT_SPEED
-        const speed = BASE_SPEED * deltaTime
+      const BASE_SPEED = PLAYER_CONFIG.MOVEMENT_SPEED
+      const speed = BASE_SPEED * deltaTime
 
-        // 조이스틱 벡터값을 사용하여 이동 속도 조절
-        if (controls.joystickVector) {
-          // 전후 이동
-          const forwardSpeed = -controls.joystickVector.y * speed
-          this.gameState.velocity.add(forward.multiplyScalar(forwardSpeed))
+      // 조이스틱 컨트롤
+      if (controls.joystickVector && (controls.joystickVector.x !== 0 || controls.joystickVector.y !== 0)) {
+        const forwardSpeed = -controls.joystickVector.y * speed
+        const rightSpeed = controls.joystickVector.x * speed
 
-          // 좌우 이동
-          const rightSpeed = controls.joystickVector.x * speed
-          this.gameState.velocity.add(right.multiplyScalar(rightSpeed))
-        } else {
-          // 키보드 컨트롤을 위한 기존 로직 유지
-          if (controls.moveForward) this.gameState.velocity.add(forward.multiplyScalar(speed))
-          if (controls.moveBackward) this.gameState.velocity.sub(forward.multiplyScalar(speed))
-          if (controls.moveLeft) this.gameState.velocity.sub(right.multiplyScalar(speed))
-          if (controls.moveRight) this.gameState.velocity.add(right.multiplyScalar(speed))
-        }
+        this.gameState.velocity.add(forward.clone().multiplyScalar(forwardSpeed))
+        this.gameState.velocity.add(right.clone().multiplyScalar(rightSpeed))
+      }
+      // 키보드 컨트롤
+      else if (controls.moveForward || controls.moveBackward || controls.moveLeft || controls.moveRight) {
+        if (controls.moveForward) this.gameState.velocity.add(forward.clone().multiplyScalar(speed))
+        if (controls.moveBackward) this.gameState.velocity.sub(forward.clone().multiplyScalar(speed))
+        if (controls.moveLeft) this.gameState.velocity.sub(right.clone().multiplyScalar(speed))
+        if (controls.moveRight) this.gameState.velocity.add(right.clone().multiplyScalar(speed))
+      }
 
-        // 대각선 이동 시 속도 정규화
-        if (this.gameState.velocity.length() > speed) {
-          this.gameState.velocity.normalize().multiplyScalar(speed)
-        }
+      // 대각선 이동 시 속도 정규화
+      if (this.gameState.velocity.length() > speed) {
+        this.gameState.velocity.normalize().multiplyScalar(speed)
+      }
 
-        const nextPosition = this.camera.position.clone().add(this.gameState.velocity)
-        if (this.gridSystem.isPositionWalkable(nextPosition.x, nextPosition.z, PLAYER_CONFIG.RADIUS)) {
-          this.camera.position.add(this.gameState.velocity)
-        }
+      const nextPosition = this.camera.position.clone().add(this.gameState.velocity)
+      if (this.gridSystem.isPositionWalkable(nextPosition.x, nextPosition.z, PLAYER_CONFIG.RADIUS)) {
+        this.camera.position.add(this.gameState.velocity)
       }
     }
   }
