@@ -45,7 +45,7 @@ export class GameController {
     )
 
     this.setupEventListeners()
-    this.animate()
+    this.animate(performance.now())
 
     this.sceneManager.initializeScene().then(() => {
       this.gridSystem.initializeGrid(this.sceneManager.getWalls())
