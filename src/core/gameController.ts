@@ -252,12 +252,24 @@ export class GameController {
         const BASE_SPEED = PLAYER_CONFIG.MOVEMENT_SPEED
         const speed = BASE_SPEED * deltaTime
 
-        if (controls.moveForward) this.gameState.velocity.add(forward.multiplyScalar(speed))
-        if (controls.moveBackward) this.gameState.velocity.sub(forward.multiplyScalar(speed))
-        if (controls.moveLeft) this.gameState.velocity.sub(right.multiplyScalar(speed))
-        if (controls.moveRight) this.gameState.velocity.add(right.multiplyScalar(speed))
+        // 조이스틱 벡터값을 사용하여 이동 속도 조절
+        if (controls.joystickVector) {
+          // 전후 이동
+          const forwardSpeed = -controls.joystickVector.y * speed
+          this.gameState.velocity.add(forward.multiplyScalar(forwardSpeed))
 
-        // Normalize diagonal movement
+          // 좌우 이동
+          const rightSpeed = controls.joystickVector.x * speed
+          this.gameState.velocity.add(right.multiplyScalar(rightSpeed))
+        } else {
+          // 키보드 컨트롤을 위한 기존 로직 유지
+          if (controls.moveForward) this.gameState.velocity.add(forward.multiplyScalar(speed))
+          if (controls.moveBackward) this.gameState.velocity.sub(forward.multiplyScalar(speed))
+          if (controls.moveLeft) this.gameState.velocity.sub(right.multiplyScalar(speed))
+          if (controls.moveRight) this.gameState.velocity.add(right.multiplyScalar(speed))
+        }
+
+        // 대각선 이동 시 속도 정규화
         if (this.gameState.velocity.length() > speed) {
           this.gameState.velocity.normalize().multiplyScalar(speed)
         }

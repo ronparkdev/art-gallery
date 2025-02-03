@@ -13,6 +13,11 @@ export class InputManager {
     moveRight: false,
   }
 
+  private joystickVector = {
+    x: 0,
+    y: 0,
+  }
+
   private dragState: DragState = {
     isDragging: false,
     dragStartPosition: { x: 0, y: 0 },
@@ -49,7 +54,6 @@ export class InputManager {
       this.setupDesktopControls()
     }
 
-    // Common handlers
     window.addEventListener('resize', () => {
       if (this.isMobile) {
         this.updateJoystickVisibility()
@@ -58,30 +62,32 @@ export class InputManager {
   }
 
   private setupMobileControls(): void {
-    // Initialize virtual joystick
+    // Initialize virtual joystick with smooth value handling
     this.joystick = new VirtualJoystick((x: number, y: number) => {
-      this.controls.moveForward = y < -0.2
-      this.controls.moveBackward = y > 0.2
-      this.controls.moveLeft = x < -0.2
-      this.controls.moveRight = x > 0.2
+      // Store raw joystick values
+      this.joystickVector.x = x
+      this.joystickVector.y = y
+
+      // Set boolean flags for basic direction control
+      // 현재는 0.1을 임계값으로 사용하여 좀 더 섬세한 조작이 가능하도록 함
+      this.controls.moveForward = y < -0.1
+      this.controls.moveBackward = y > 0.1
+      this.controls.moveLeft = x < -0.1
+      this.controls.moveRight = x > 0.1
     })
 
-    // Show joystick for mobile
     this.updateJoystickVisibility()
 
     // Setup right side touch handling for rotation
     document.addEventListener('touchstart', (e: TouchEvent) => {
       const touch = e.touches[0]
-
-      // Get joystick area
       if (this.joystick) {
         const joystickElement = this.joystick.getElement()
         this.joystickRect = joystickElement.getBoundingClientRect()
       }
 
-      // Check if touch is in joystick area
       if (this.joystickRect && this.isInJoystickArea(touch.clientX, touch.clientY)) {
-        return // Don't handle rotation for joystick area
+        return
       }
 
       if (this.rotationTouchId === null) {
@@ -94,7 +100,6 @@ export class InputManager {
       if (this.rotationTouchId !== null) {
         const touch = Array.from(e.touches).find(t => t.identifier === this.rotationTouchId)
         if (touch) {
-          // Check if touch is in joystick area
           if (this.joystickRect && this.isInJoystickArea(touch.clientX, touch.clientY)) {
             return
           }
@@ -274,8 +279,11 @@ export class InputManager {
     }
   }
 
-  public getMovementControls(): MovementControls {
-    return this.controls
+  public getMovementControls(): MovementControls & { joystickVector?: { x: number; y: number } } {
+    return {
+      ...this.controls,
+      joystickVector: this.joystickVector, // 조이스틱 벡터값도 함께 전달
+    }
   }
 
   public getDragState(): DragState {
