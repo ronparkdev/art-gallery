@@ -16,6 +16,7 @@ export class GameController {
   private pathFinder: PathFinder
   private inputManager: InputManager
 
+  private lastFrameTime: number = 0
   private moveStartTime: number = 0
 
   private gameState: GameState = {
@@ -178,12 +179,13 @@ export class GameController {
     this.gameState.targetRotationY -= deltaRotation
   }
 
-  private updateMovement(): void {
+  private updateMovement(deltaTime: number): void {
     if (this.gameState.isMoving && this.gameState.currentPath.length > 0) {
+      const elapsedTime = (performance.now() - this.moveStartTime) / 1000
       const currentTarget = this.gameState.currentPath[0]
       const distance = this.camera.position.distanceTo(currentTarget)
 
-      // Calculate desired rotation based on movement direction
+      // Calculate direction and rotation
       const direction = new THREE.Vector3().subVectors(currentTarget, this.camera.position).normalize()
       const targetAngle = Math.atan2(-direction.x, -direction.z)
 
@@ -205,28 +207,22 @@ export class GameController {
         rotationDiff += 2 * Math.PI
       }
 
-      // Calculate linear acceleration for rotation
-      const elapsedTime = (performance.now() - this.moveStartTime) / 1000
-      const ROTATION_ACCELERATION_DURATION = 0.5
-      const ROTATION_MAX_SPEED = 0.2
-
       // Linear acceleration for rotation
-      const rotationProgress = Math.min(elapsedTime / ROTATION_ACCELERATION_DURATION, 1)
-      const rotationSpeed = ROTATION_MAX_SPEED * rotationProgress
+      const rotationProgress = Math.min(elapsedTime / PLAYER_CONFIG.ROTATION_ACCELERATION_DURATION, 1)
+      const rotationSpeed = PLAYER_CONFIG.ROTATION_SPEED * rotationProgress * deltaTime
 
       // Apply rotation
       this.gameState.targetRotationY = this.camera.rotation.y + rotationDiff * rotationSpeed
 
       if (distance > 0.1) {
-        // Calculate movement speed with easeInOutQuad
-        const MOVEMENT_ACCELERATION_DURATION = 0.8 // 이동 가속/감속 시간
-        const movementProgress = Math.min(elapsedTime / MOVEMENT_ACCELERATION_DURATION, 1)
+        // Time-based movement speed
+        const movementProgress = Math.min(elapsedTime / PLAYER_CONFIG.MOVEMENT_ACCELERATION_DURATION, 1)
         const easeInOutQuad =
           movementProgress < 0.5
             ? 2 * movementProgress * movementProgress
             : 1 - Math.pow(-2 * movementProgress + 2, 2) / 2
 
-        const speed = PLAYER_CONFIG.MOVEMENT_SPEED * easeInOutQuad
+        const speed = PLAYER_CONFIG.MOVEMENT_SPEED * easeInOutQuad * deltaTime
         const movement = direction.multiplyScalar(speed)
         const newPosition = this.camera.position.clone().add(movement)
 
@@ -234,14 +230,11 @@ export class GameController {
           this.camera.position.copy(newPosition)
         } else {
           this.gameState.currentPath.shift()
-          this.moveStartTime = performance.now()
         }
       } else {
         this.gameState.currentPath.shift()
         if (this.gameState.currentPath.length === 0) {
           this.gameState.isMoving = false
-        } else {
-          this.moveStartTime = performance.now()
         }
       }
     }
@@ -256,13 +249,17 @@ export class GameController {
         const forward = direction.clone()
         const right = new THREE.Vector3(-direction.z, 0, direction.x)
 
-        if (controls.moveForward) this.gameState.velocity.add(forward.multiplyScalar(PLAYER_CONFIG.MOVEMENT_SPEED))
-        if (controls.moveBackward) this.gameState.velocity.add(forward.multiplyScalar(-PLAYER_CONFIG.MOVEMENT_SPEED))
-        if (controls.moveLeft) this.gameState.velocity.add(right.multiplyScalar(-PLAYER_CONFIG.MOVEMENT_SPEED))
-        if (controls.moveRight) this.gameState.velocity.add(right.multiplyScalar(PLAYER_CONFIG.MOVEMENT_SPEED))
+        const BASE_SPEED = PLAYER_CONFIG.MOVEMENT_SPEED
+        const speed = BASE_SPEED * deltaTime
 
-        if (this.gameState.velocity.length() > PLAYER_CONFIG.MOVEMENT_SPEED) {
-          this.gameState.velocity.normalize().multiplyScalar(PLAYER_CONFIG.MOVEMENT_SPEED)
+        if (controls.moveForward) this.gameState.velocity.add(forward.multiplyScalar(speed))
+        if (controls.moveBackward) this.gameState.velocity.sub(forward.multiplyScalar(speed))
+        if (controls.moveLeft) this.gameState.velocity.sub(right.multiplyScalar(speed))
+        if (controls.moveRight) this.gameState.velocity.add(right.multiplyScalar(speed))
+
+        // Normalize diagonal movement
+        if (this.gameState.velocity.length() > speed) {
+          this.gameState.velocity.normalize().multiplyScalar(speed)
         }
 
         const nextPosition = this.camera.position.clone().add(this.gameState.velocity)
@@ -277,9 +274,14 @@ export class GameController {
     this.camera.rotation.y = this.gameState.targetRotationY
   }
 
-  private animate = (): void => {
+  private animate = (currentTime: number): void => {
     requestAnimationFrame(this.animate)
-    this.updateMovement()
+
+    // Calculate delta time in seconds
+    const deltaTime = Math.min(0.1, this.lastFrameTime ? (currentTime - this.lastFrameTime) / 1000 : 1 / 60)
+    this.lastFrameTime = currentTime
+
+    this.updateMovement(deltaTime)
     this.updateRotation()
     this.renderer.render(this.sceneManager.getScene(), this.camera)
   }
